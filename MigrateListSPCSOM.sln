@@ -1,0 +1,25 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio Version 16
+VisualStudioVersion = 16.0.29728.190
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "MigrateListSPCSOM", "MigrateListSPCSOM\MigrateListSPCSOM.csproj", "{CE946ECA-8403-430D-98EE-8A8BBF8DDACC}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Any CPU = Debug|Any CPU
+		Release|Any CPU = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{CE946ECA-8403-430D-98EE-8A8BBF8DDACC}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{CE946ECA-8403-430D-98EE-8A8BBF8DDACC}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{CE946ECA-8403-430D-98EE-8A8BBF8DDACC}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{CE946ECA-8403-430D-98EE-8A8BBF8DDACC}.Release|Any CPU.Build.0 = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(ExtensibilityGlobals) = postSolution
+		SolutionGuid = {FD42AFE2-57D9-4C1D-AF6D-19CD2EB624AF}
+	EndGlobalSection
+EndGlobal
