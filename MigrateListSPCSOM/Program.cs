@@ -24,8 +24,8 @@ namespace MigrateListSPCSOM
 			string destSite = "https://devbit2k11.sharepoint.com/sites/MineTest";
 			ClientContext ctx = getClientContext(siteUrl);
 			MigrateList(listName, ctx, destSite);
+			Console.ReadLine();
 		}
-
 		private static void CopyListItemsSP(ListItemCollection itemsToMigrate, ClientContext destContext,string listName)
 		{
 			List destinationList = destContext.Web.Lists.GetByTitle(listName);
@@ -104,13 +104,14 @@ namespace MigrateListSPCSOM
 					
 					using (ClientContext destContext = getClientContext(destSite))
 					{
-						List destinationList = destContext.Web.Lists.GetByTitle(listName);
+						
 						if (listExists(listName, destContext))
 						{
+							List destinationList = destContext.Web.Lists.GetByTitle(listName);
 							Console.WriteLine("List exist at destination site");
 							ListItemCollection destinationListItems = destinationList.GetItems(CamlQuery.CreateAllItemsQuery());
-							sourceContext.Load(destinationListItems);
-							sourceContext.ExecuteQuery();
+							destContext.Load(destinationListItems);
+							destContext.ExecuteQuery();
 							if (destinationListItems.Count < itemsToMigrate.Count)
 							{
 								Console.WriteLine("List exist at destination site");
@@ -121,10 +122,11 @@ namespace MigrateListSPCSOM
 						}
 						else
 						{
+							
 							Console.WriteLine("List at destination does not exist");
 							CreateListSP(destContext, listName);
 							Console.WriteLine(listName+" List created successfully");
-							
+							List destinationList = destContext.Web.Lists.GetByTitle(listName);
 							int count = 0;
 							foreach (var field in sourceList.Fields)
 							{
@@ -151,8 +153,7 @@ namespace MigrateListSPCSOM
 			}
 			catch (Exception ex)
 			{
-
-				throw;
+				Console.WriteLine(ex.StackTrace+"   "+ex.Message);
 			}
 
 		}
