@@ -15,7 +15,7 @@ namespace MigrateListSPCSOM
 		static void Main(string[] args)
 		{
 			string srUrl = "https://devbit2k11.sharepoint.com/sites/MyCompany";
-			string listName = "Employee Onboarding Forms";
+			string listName = "Cars";
 			string destSiteUrl = "https://devbit2k11.sharepoint.com/sites/MineTest";
 			MigrateList(listName, getClientContext(srUrl), destSiteUrl);
 		}
@@ -32,7 +32,7 @@ namespace MigrateListSPCSOM
 				ListItem itemToCreate = destinationList.AddItem(itemInfo);
 				foreach (Field field in destinationList.Fields)
 				{
-					Console.WriteLine(field.SchemaXml);
+					//Console.WriteLine(field.SchemaXml);
 					if (!field.ReadOnlyField && !field.Hidden &&
 						 field.InternalName != "Attachments")
 					{
@@ -88,7 +88,7 @@ namespace MigrateListSPCSOM
 		private static void MigrateList(string listName,ClientContext sourceContext,string destSiteUrl)
 		{
 			List sourceList = null;
-			ListItemCollection sourceListItemColllection = null;
+			ListItemCollection sourceListItemCollection = null;
 			List<ListItem> itemsTomigrate = null;
 			
 			try
@@ -101,77 +101,55 @@ namespace MigrateListSPCSOM
 					sourceContext.ExecuteQuery();
 					if (sourceList.ItemCount <= 5000)
 					{
-					    sourceListItemColllection = sourceList.GetItems(CamlQuery.CreateAllItemsQuery());
-						sourceContext.Load(sourceListItemColllection);
+					    sourceListItemCollection = sourceList.GetItems(CamlQuery.CreateAllItemsQuery());
+						sourceContext.Load(sourceListItemCollection);
 						sourceContext.ExecuteQuery();
-						itemsTomigrate = sourceListItemColllection.ToList();
+						itemsTomigrate = sourceListItemCollection.ToList();
 					}
 					else
 					{
 						itemsTomigrate = GetAllItemSP.GetListItems(sourceContext, listName);
 					}
-					
-					
-				
-					
+					//!field.ReadOnlyField && !field.Hidden && field.InternalName != "Attachments" && field.Group != "_Hidden" && field.InternalName != "Title"
+					List<Field> validFieldCol = sourceList.Fields.Where(x => !x.ReadOnlyField && !x.Hidden && x.InternalName != "Attachments" && x.Group != "_Hidden" && x.InternalName != "Title").ToList();
+
+
 					using (ClientContext destContext = getClientContext(destSiteUrl))
 					{
-						
+						List destinationList = null;
 						if (listExists(listName, destContext))
 						{
-							List destinationList = destContext.Web.Lists.GetByTitle(listName);
+							destinationList = destContext.Web.Lists.GetByTitle(listName);
 							destContext.Load(destinationList);
 							destContext.ExecuteQuery();
 							Console.WriteLine("List exist at destination site");
-
-							if (sourceList.ItemCount>destinationList.ItemCount)
+							if (sourceList.ItemCount > destinationList.ItemCount)
 							{
 								Console.WriteLine("Items at destination list has item less than source");
 								destinationList.DeleteObject();
 								destContext.ExecuteQueryRetry();
+								Console.WriteLine("List Deleted at destination site");
+								CreateListSP(destContext, listName, sourceList);
+								Console.WriteLine(listName + " List created successfully");
+								CreateFieldsSP.CopyFields(validFieldCol, destContext, listName);
+								Console.WriteLine("Field created @ destination url.....");
+								Console.WriteLine("Copy items Starting.....");
+								CopyListItemsSP(itemsTomigrate, destContext, listName);
+								Console.WriteLine("Copied list items completed");
 							}
-
-							Console.WriteLine("List Deleted at destination site");
-							CreateListSP(destContext, listName, sourceList);
-							Console.WriteLine(listName + " List created successfully");
-							int count = 0;
-							foreach (var field in sourceList.Fields)
-							{
-								if (!field.ReadOnlyField && !field.Hidden && field.InternalName != "Attachments" && field.Group != "_Hidden" && field.InternalName != "Title")
-								{
-									count++;
-									Field simpleTextField = destinationList.Fields.AddFieldAsXml(field.SchemaXml, true, AddFieldOptions.AddFieldInternalNameHint);
-								}
-							}
-
-							Console.WriteLine(count+ ": Fields Created");
-							destContext.ExecuteQuery();
-							Console.WriteLine("Field created @ destination url.....");
-							Console.WriteLine("Copy items Starting.....");
-							CopyListItemsSP(itemsTomigrate, destContext, listName);
-							Console.WriteLine("Copied list items completed");
+							
 						}
 						else
 						{
 							Console.WriteLine("List at destination does not exist");
 							CreateListSP(destContext, listName);
 							Console.WriteLine(listName+" List created successfully");
-							List destinationList = destContext.Web.Lists.GetByTitle(listName);
-							int count = 0;
-							Console.WriteLine("Creating Fields @ destination .....");
-							foreach (var field in sourceList.Fields)
-							{
-								if (!field.ReadOnlyField && !field.Hidden && field.InternalName != "Attachments" && field.Group !="_Hidden" && field.InternalName!="Title")
-								{
-									count++;
-									Field simpleTextField = destinationList.Fields.AddFieldAsXml(field.SchemaXml, true, AddFieldOptions.AddFieldInternalNameHint);
-								}
-							}
-							Console.WriteLine(count);
-							destContext.ExecuteQuery();
+							destinationList = destContext.Web.Lists.GetByTitle(listName);
+							CreateFieldsSP.CopyFields(validFieldCol, destContext, listName);
 							Console.WriteLine("Field created @ destination url.....");
 							Console.WriteLine("Copy items Starting.....");
-							CopyListItemsSP(itemsTomigrate.ToList(), destContext, listName);
+							CopyListItemsSP(itemsTomigrate, destContext, listName);
+							Console.WriteLine("List Items Copied success");
 						}
 					}
 				}
