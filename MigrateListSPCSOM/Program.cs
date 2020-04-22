@@ -6,7 +6,7 @@ using System.Threading.Tasks;
 using Microsoft.SharePoint.Client;
 using OfficeDevPnP.Core;
 using System.Configuration;
-
+using System.Runtime.InteropServices;
 
 namespace MigrateListSPCSOM
 {
@@ -26,7 +26,7 @@ namespace MigrateListSPCSOM
 			MigrateList(listName, ctx, destSite);
 			Console.ReadLine();
 		}
-		private static void CopyListItemsSP(ListItemCollection itemsToMigrate, ClientContext destContext,string listName)
+		private static void CopyListItemsSP(List<ListItem> itemsToMigrate, ClientContext destContext,string listName)
 		{
 			List destinationList = destContext.Web.Lists.GetByTitle(listName);
 			destContext.Load(destinationList.Fields);
@@ -37,7 +37,6 @@ namespace MigrateListSPCSOM
 				
 				ListItemCreationInformation itemInfo = new ListItemCreationInformation();
 				ListItem itemToCreate = destinationList.AddItem(itemInfo);
-
 
 				foreach (Field field in destinationList.Fields)
 				{
@@ -59,19 +58,25 @@ namespace MigrateListSPCSOM
 				destContext.ExecuteQuery();
 			}
 		}
-		private static void CreateListSP(ClientContext clientContext,string listName)
+		private static void CreateListSP(ClientContext ctx,string listName, [Optional] List sourceList)
 		{
 			ListCreationInformation creationInfo = new ListCreationInformation();
-			creationInfo.Title = listName;
-			creationInfo.Description = "new list created " + listName;
-			creationInfo.TemplateType = (int)ListTemplateType.GenericList;
-			// Create a new custom list    
+			if (sourceList!=null)
+			{
+				creationInfo.Title = sourceList.Title;
+				creationInfo.Description = sourceList.Description;
+				creationInfo.TemplateType = sourceList.BaseTemplate;
+			}
+			else
+			{
+				creationInfo.Title = listName;
+				creationInfo.Description = "new list created " + listName;
+				creationInfo.TemplateType = (int)ListTemplateType.GenericList;
+			}
 
-			List newList = clientContext.Web.Lists.Add(creationInfo);
-			// Retrieve the custom list properties    
-			clientContext.Load(newList);
-			// Execute the query to the server.    
-			clientContext.ExecuteQuery();
+			List newList = ctx.Web.Lists.Add(creationInfo);
+			ctx.Load(newList);
+			ctx.ExecuteQuery();
 		}
 		private static bool listExists(string listName,ClientContext ctx)
 		{
@@ -94,7 +99,6 @@ namespace MigrateListSPCSOM
 				if (listExists(listName,sourceContext))
 				{
 					sourceList = sourceContext.Web.Lists.GetByTitle(listName);
-				
 					sourceContext.Load(sourceList.Fields);
 					itemsToMigrate = sourceList.GetItems(CamlQuery.CreateAllItemsQuery());
 					sourceContext.Load(itemsToMigrate);
@@ -109,16 +113,25 @@ namespace MigrateListSPCSOM
 						{
 							List destinationList = destContext.Web.Lists.GetByTitle(listName);
 							Console.WriteLine("List exist at destination site");
-							ListItemCollection destinationListItems = destinationList.GetItems(CamlQuery.CreateAllItemsQuery());
-							destContext.Load(destinationListItems);
-							destContext.ExecuteQuery();
-							if (destinationListItems.Count < itemsToMigrate.Count)
+							destinationList.DeleteObject();
+							destContext.ExecuteQueryRetry();
+							Console.WriteLine("List Deleted at destination site");
+							CreateListSP(destContext, listName, sourceList);
+							Console.WriteLine(listName + " List created successfully");
+							int count = 0;
+							foreach (var field in sourceList.Fields)
 							{
-								Console.WriteLine("List exist at destination site");
-								CopyListItemsSP(itemsToMigrate, destContext, listName);
+								if (!field.ReadOnlyField && !field.Hidden && field.InternalName != "Attachments" && field.Group != "_Hidden" && field.InternalName != "Title")
+								{
+									count++;
+									Field simpleTextField = destinationList.Fields.AddFieldAsXml(field.SchemaXml, true, AddFieldOptions.AddFieldInternalNameHint);
+								}
 							}
-							else
-								Console.WriteLine("List Created Successfully");
+							Console.WriteLine(count+ ": Fields Created");
+							destContext.ExecuteQuery();
+							Console.WriteLine("Field created @ destination url.....");
+							Console.WriteLine("Copy items Starting.....");
+							CopyListItemsSP(itemsToMigrate.ToList(), destContext, listName);
 						}
 						else
 						{
@@ -140,7 +153,7 @@ namespace MigrateListSPCSOM
 							destContext.ExecuteQuery();
 							Console.WriteLine("Field created @ destination url.....");
 							Console.WriteLine("Copy items Starting.....");
-							CopyListItemsSP(itemsToMigrate, destContext, listName);
+							CopyListItemsSP(itemsToMigrate.ToList(), destContext, listName);
 						}
 					}
 				}
