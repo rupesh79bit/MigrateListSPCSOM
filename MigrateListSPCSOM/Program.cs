@@ -10,34 +10,26 @@ using System.Runtime.InteropServices;
 
 namespace MigrateListSPCSOM
 {
-	public enum SharepointAuth
-	{
-		Sharepointonline,
-		Sharepointonpremise
-	}
 	class Program
 	{
 		static void Main(string[] args)
 		{
-			string siteUrl = "https://devbit2k11.sharepoint.com/sites/MyCompany";
-			string listName = "Employee";
-			string destSite = "https://devbit2k11.sharepoint.com/sites/MineTest";
-			ClientContext ctx = getClientContext(siteUrl);
-			MigrateList(listName, ctx, destSite);
-			Console.ReadLine();
+			string srUrl = "https://devbit2k11.sharepoint.com/sites/MyCompany";
+			string listName = "Employee Onboarding Forms";
+			string destSiteUrl = "https://devbit2k11.sharepoint.com/sites/MineTest";
+			MigrateList(listName, getClientContext(srUrl), destSiteUrl);
 		}
 		private static void CopyListItemsSP(List<ListItem> itemsToMigrate, ClientContext destContext,string listName)
 		{
 			List destinationList = destContext.Web.Lists.GetByTitle(listName);
 			destContext.Load(destinationList.Fields);
 			destContext.ExecuteQuery();
+			int cnt = 0;
 			//Migrating data.
 			foreach (ListItem item in itemsToMigrate)
 			{
-				
 				ListItemCreationInformation itemInfo = new ListItemCreationInformation();
 				ListItem itemToCreate = destinationList.AddItem(itemInfo);
-
 				foreach (Field field in destinationList.Fields)
 				{
 					Console.WriteLine(field.SchemaXml);
@@ -50,13 +42,17 @@ namespace MigrateListSPCSOM
 						}
 						catch (Exception ex)
 						{
-							//Log exception
+							Console.WriteLine(ex.Message);
 						}
 					}
 				}
 				itemToCreate.Update();
-				destContext.ExecuteQuery();
+				if (++cnt % 400 == 0)
+				{
+					destContext.ExecuteQuery();
+				}
 			}
+			destContext.ExecuteQuery();
 		}
 		private static void CreateListSP(ClientContext ctx,string listName, [Optional] List sourceList)
 		{
@@ -89,32 +85,52 @@ namespace MigrateListSPCSOM
 			// for the multi factor authentication code.  
 			return authManager.GetWebLoginClientContext(siteUrl);
 		}
-		private static void MigrateList(string listName,ClientContext sourceContext,string destSite)
+		private static void MigrateList(string listName,ClientContext sourceContext,string destSiteUrl)
 		{
 			List sourceList = null;
-			ListItemCollection itemsToMigrate = null;
-
+			ListItemCollection sourceListItemColllection = null;
+			List<ListItem> itemsTomigrate = null;
+			
 			try
 			{
 				if (listExists(listName,sourceContext))
 				{
 					sourceList = sourceContext.Web.Lists.GetByTitle(listName);
 					sourceContext.Load(sourceList.Fields);
-					itemsToMigrate = sourceList.GetItems(CamlQuery.CreateAllItemsQuery());
-					sourceContext.Load(itemsToMigrate);
+					sourceContext.Load(sourceList);
 					sourceContext.ExecuteQuery();
+					if (sourceList.ItemCount <= 5000)
+					{
+					    sourceListItemColllection = sourceList.GetItems(CamlQuery.CreateAllItemsQuery());
+						sourceContext.Load(sourceListItemColllection);
+						sourceContext.ExecuteQuery();
+						itemsTomigrate = sourceListItemColllection.ToList();
+					}
+					else
+					{
+						itemsTomigrate = GetAllItemSP.GetListItems(sourceContext, listName);
+					}
+					
 					
 				
 					
-					using (ClientContext destContext = getClientContext(destSite))
+					using (ClientContext destContext = getClientContext(destSiteUrl))
 					{
 						
 						if (listExists(listName, destContext))
 						{
 							List destinationList = destContext.Web.Lists.GetByTitle(listName);
+							destContext.Load(destinationList);
+							destContext.ExecuteQuery();
 							Console.WriteLine("List exist at destination site");
-							destinationList.DeleteObject();
-							destContext.ExecuteQueryRetry();
+
+							if (sourceList.ItemCount>destinationList.ItemCount)
+							{
+								Console.WriteLine("Items at destination list has item less than source");
+								destinationList.DeleteObject();
+								destContext.ExecuteQueryRetry();
+							}
+
 							Console.WriteLine("List Deleted at destination site");
 							CreateListSP(destContext, listName, sourceList);
 							Console.WriteLine(listName + " List created successfully");
@@ -127,20 +143,22 @@ namespace MigrateListSPCSOM
 									Field simpleTextField = destinationList.Fields.AddFieldAsXml(field.SchemaXml, true, AddFieldOptions.AddFieldInternalNameHint);
 								}
 							}
+
 							Console.WriteLine(count+ ": Fields Created");
 							destContext.ExecuteQuery();
 							Console.WriteLine("Field created @ destination url.....");
 							Console.WriteLine("Copy items Starting.....");
-							CopyListItemsSP(itemsToMigrate.ToList(), destContext, listName);
+							CopyListItemsSP(itemsTomigrate, destContext, listName);
+							Console.WriteLine("Copied list items completed");
 						}
 						else
 						{
-							
 							Console.WriteLine("List at destination does not exist");
 							CreateListSP(destContext, listName);
 							Console.WriteLine(listName+" List created successfully");
 							List destinationList = destContext.Web.Lists.GetByTitle(listName);
 							int count = 0;
+							Console.WriteLine("Creating Fields @ destination .....");
 							foreach (var field in sourceList.Fields)
 							{
 								if (!field.ReadOnlyField && !field.Hidden && field.InternalName != "Attachments" && field.Group !="_Hidden" && field.InternalName!="Title")
@@ -153,14 +171,13 @@ namespace MigrateListSPCSOM
 							destContext.ExecuteQuery();
 							Console.WriteLine("Field created @ destination url.....");
 							Console.WriteLine("Copy items Starting.....");
-							CopyListItemsSP(itemsToMigrate.ToList(), destContext, listName);
+							CopyListItemsSP(itemsTomigrate.ToList(), destContext, listName);
 						}
 					}
 				}
 				else
 				{
 					Console.WriteLine("list at source does not exist");
-					
 				}
 				
 			}
