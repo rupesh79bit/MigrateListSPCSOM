@@ -7,6 +7,7 @@ using Microsoft.SharePoint.Client;
 using OfficeDevPnP.Core;
 using System.Configuration;
 using System.Runtime.InteropServices;
+using System.Net;
 
 namespace MigrateListSPCSOM
 {
@@ -14,10 +15,18 @@ namespace MigrateListSPCSOM
 	{
 		static void Main(string[] args)
 		{
-			string srUrl = "https://devbit2k11.sharepoint.com/sites/MyCompany";
-			string listName = "Cars";
-			string destSiteUrl = "https://devbit2k11.sharepoint.com/sites/MineTest";
+			string srUrl = GetConfigValues("sourceSiteUrl");
+			string listName = GetConfigValues("listName");
+			string destSiteUrl = GetConfigValues("destinationSiteUrl");
 			MigrateList(listName, getClientContext(srUrl), destSiteUrl);
+			//var sitesUri = "http://client1.rmsuat.evalueserve.com/sites/dynamotesting/";
+			//string userName = "ramesh.pandey@rmsdomain.com";
+			//string pass = "Evs1234$";
+			//var ctx = new ClientContext(sitesUri);
+			//ctx.Credentials = new NetworkCredential(userName, pass);
+			//ctx.Load(ctx.Web);
+			//ctx.ExecuteQuery();
+			//Console.WriteLine(ctx.Web.Title);
 		}
 		private static void CopyListItemsSP(List<ListItem> itemsToMigrate, ClientContext destContext,string listName)
 		{
@@ -47,7 +56,7 @@ namespace MigrateListSPCSOM
 					}
 				}
 				itemToCreate.Update();
-				if (++cnt % 400 == 0)
+				if (++cnt % 4000 == 0)
 				{
 					destContext.ExecuteQuery();
 				}
@@ -80,7 +89,7 @@ namespace MigrateListSPCSOM
 		}
 		private static ClientContext getClientContext(string siteUrl)
 		{
-			var authManager = new AuthenticationManager();
+			var authManager = new OfficeDevPnP.Core.AuthenticationManager();
 			// This method calls a pop up window with the login page and it also prompts  
 			// for the multi factor authentication code.  
 			return authManager.GetWebLoginClientContext(siteUrl);
@@ -123,7 +132,7 @@ namespace MigrateListSPCSOM
 							destContext.Load(destinationList);
 							destContext.ExecuteQuery();
 							Console.WriteLine("List exist at destination site");
-							if (sourceList.ItemCount > destinationList.ItemCount)
+							if (sourceList.ItemCount != destinationList.ItemCount)
 							{
 								Console.WriteLine("Items at destination list has item less than source");
 								destinationList.DeleteObject();
@@ -169,5 +178,6 @@ namespace MigrateListSPCSOM
 		{
 			return ConfigurationManager.AppSettings[key];
 		}
+
 	}
 }
